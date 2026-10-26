@@ -2,20 +2,28 @@
 title: "Supporting_information_Fish_and_Cephalopods_under_Climate_Change"
 author: "Morgane_Amelot"
 date: "2026-10-26"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 The data and analysis are presented in this document following the Material and Methods sections from the paper. 
+
+```{r}
+library(FD)
+library(ggplot2)
+```
+
 
 # 2.1. Ecological traits data
 
 The trait database corresponds for fish and cephelopods to the traits by species extracted from Aquamaps for habitat traits and Fishbase and Sealifebase and papers for cephalopods (see paper for the detailed list of references). 
 They include traits that were available for more than 75% of the species included in the analysis. 
 When one trait was only missing for less than 25% of the species, the value was estimated based on these decision trees, for fish (A); for cephalopods (B). 
-```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%'}
+```{r,  echo=FALSE, fig.cap="A caption", out.width = '100%'}
 knitr::include_graphics("Figures/decision_tree_fish.png")
 ```
-```{r pressure, echo=FALSE, fig.cap="A caption", out.width = '100%'}
+```{r, echo=FALSE, fig.cap="A caption", out.width = '100%'}
 knitr::include_graphics("Figures/decision_tree_cephalopods.png")
 ```
 
@@ -50,5 +58,609 @@ pairs(BDT_CEPH[,2:ncol(BDT_CEPH)], lower.panel=panel.smooth,
 
 ```
 
-#  Species abundance data 
+# 2.2  Species abundance data 
 
+```{r}
+load("DATA/abundance_station_species_year_fish.Rdata")
+fish_abundance<-stock_list_abundance
+load("DATA/abundance_station_species_year_ceph.Rdata")
+ceph_abundance<-stock_list_abundance
+```
+
+# 2.3 Environmental data 
+
+With environmental variables followed by a x being the annual estimates and environmental variables followed by a y being the 'short term'/'immediate snapshot' of the environmental variables at the time of the sampling (november-december)
+
+```{r}
+ load("DATA/dataframe_model_2.Rdata")
+```
+
+
+# 2.4. Analysis
+
+
+## 2.4.1. Ecological traits Community Weighted Means (CWMs)
+
+
+Calculate CWM for fish 
+```{r ,warning=FALSE, message=FALSE}
+
+# keep only selected traits and homogenized species names
+keepTraits <- c("Mean_temperature","Max_depth","Range_salinity","Maximum_body_length","Growth_rate","Fecundity","Offspring_size","Age_maturity","Trophic_level_")
+BDT_FISH$SPECIES<-gsub("_", ".", BDT_FISH$SPECIES)
+rownames(BDT_FISH)<-BDT_FISH$SPECIES
+trait<-BDT_FISH
+trait <- trait[,keepTraits]
+abu<-vector("list", length=24)
+fishFD<-vector("list", length=24)
+
+# create empty vector for all traits we are interested in 
+Mean_temperature1<-Max_Depth1<-Maximum_body_length1<-Fecundity1<-Offspring_size1<-Trophic_level_1<-station1<-years1<-years2<-Range_salinity1<-Growth_rate1<-Age_maturity1<-NULL
+Mean_temperature<-Max_Depth<-Maximum_body_length<-Fecundity<-Offspring_size<-Trophic_level_<-stations<-Range_salinity<-Growth_rate<-Age_maturity<-NULL
+
+# loop over the years (i)
+years<-c(seq(1997,2016),seq(2018,2021))
+for (i in 1:24){
+  
+  abu1<-fish_abundance[[i]]
+  species<-rownames(abu1)
+  species<- gsub(" ", ".", species)
+  rownames(abu1)<-species
+  abu1<-abu1[, colSums(abu1 != 0) > 0]
+  
+  abu2<-as.data.frame(t(abu1))
+  
+  abu2<-abu2[, colSums(abu2 != 0) > 0]
+  abu[[i]]<-abu2
+  
+  
+  mtaxa <- match(colnames(abu[[i]]), row.names(trait))
+  
+  #check if there all species are matched: must be TRUE
+  all(!is.na(mtaxa))
+  
+  trait1 <- trait[mtaxa,]
+  all(colnames(abu[[i]])==row.names(trait1))
+  
+  fishFD[[i]]<-dbFD(trait1, abu[[i]], calc.FDiv = F, calc.FRic = F) 
+  
+
+  Mean_temperature<-fishFD[[i]]$CWM$Mean_temperature
+  Max_Depth<-fishFD[[i]]$CWM$Max_depth
+  Maximum_body_length<-fishFD[[i]]$CWM$Maximum_body_length
+  Fecundity<-fishFD[[i]]$CWM$Fecundity
+  Offspring_size<-fishFD[[i]]$CWM$Offspring_size
+  Trophic_level_<-fishFD[[i]]$CWM$Trophic_level_
+  Range_salinity<-fishFD[[i]]$CWM$Range_salinity
+  Growth_rate<-fishFD[[i]]$CWM$Growth_rate
+  Age_maturity<-fishFD[[i]]$CWM$Age_maturity
+  
+  stations<-rownames(fishFD[[i]]$CWM)
+  years2<-rep(years[[i]],length(stations))
+
+  Mean_temperature1<-c(Mean_temperature,Mean_temperature1)
+  Max_Depth1<-c(Max_Depth,Max_Depth1)
+  Maximum_body_length1<-c(Maximum_body_length,Maximum_body_length1)
+  Fecundity1<-c(Fecundity,Fecundity1)
+  Offspring_size1<-c(Offspring_size,Offspring_size1)
+  Trophic_level_1<-c(Trophic_level_,Trophic_level_1)
+  Range_salinity1<-c(Range_salinity,Range_salinity1)
+  Growth_rate1<-c(Growth_rate,Growth_rate1)
+  Age_maturity1<-c(Age_maturity,Age_maturity1)
+  station1<-c(stations,station1)
+  years1<-c(years2,years1)
+  
+}
+
+
+data_for_model<-data.frame(Mean_temperature1=Mean_temperature1,
+                           Max_Depth1=Max_Depth1,
+                           Maximum_body_length1=Maximum_body_length1,
+                           Fecundity1=Fecundity1,
+                           Offspring_size1=Offspring_size1,
+                           Trophic_level_1=Trophic_level_1,
+                           Range_salinity1=Range_salinity1,
+                           Growth_rate1=Growth_rate1,
+                           Age_maturity1=Age_maturity1,
+                           station=station1, 
+                           years1=years1)
+
+stations<-unique(data_for_model$station1)
+stations_2<-slope1<-pvalue1<-NULL
+
+save(data_for_model, file="DATA/data_for_model_fish.Rdata")
+
+```
+
+
+Calculate CWM for cephalopods 
+
+```{r clean-chunk, results = "hide", warning = FALSE, message = FALSE}
+BDT_CEPH$SPECIES<-gsub(" ", ".", BDT_CEPH$SPECIES)
+rownames(BDT_CEPH)<-BDT_CEPH$SPECIES
+trait<-BDT_CEPH[,2:ncol(BDT_CEPH)]
+
+abu<-vector("list", length=24)
+cephFD<-vector("list", length=24)
+
+Mean_temperature1<-Range_temperature1<-Max_Depth1<-Maximum_body_length1<-Fecundity1<-Trophic_level_1<-station1<-years1<-years2<-Length_maturity1<-NULL
+Mean_temperature<-Range_temperature<-Max_Depth<-Maximum_body_length<-Fecundity<-Trophic_level_<-stations<-Length_maturity<-NULL
+
+
+years<-c(seq(1997,2016),seq(2018,2021))
+for (i in 1:24){
+  
+  abu1<-ceph_abundance[[i]]
+  species<-rownames(abu1)
+  species<- gsub(" ", ".", species)
+  rownames(abu1)<-species
+  abu1<-abu1[, colSums(abu1 != 0) > 0]
+  
+  abu2<-as.data.frame(t(abu1))
+  
+  abu2<-abu2[, colSums(abu2 != 0) > 0]
+  abu[[i]]<-abu2
+  
+  
+  mtaxa <- match(colnames(abu[[i]]), row.names(trait))
+  
+  #check if there all species are matched: must be TRUE
+  all(!is.na(mtaxa))
+  
+  trait1 <- trait[mtaxa,]
+  all(colnames(abu[[i]])==row.names(trait1))
+  
+  cephFD[[i]]<-dbFD(trait1, abu[[i]], calc.FDiv = F, calc.FRic = F)
+  
+  Mean_temperature<-cephFD[[i]]$CWM$Mean_temperature
+  Range_temperature<-cephFD[[i]]$CWM$Range_temperature
+  Max_Depth<-cephFD[[i]]$CWM$Max_depth
+  Maximum_body_length<-cephFD[[i]]$CWM$Maximum_length
+  Fecundity<-cephFD[[i]]$CWM$Fecundity_max
+  Trophic_level_<-cephFD[[i]]$CWM$Trophic_level
+  Length_maturity<-cephFD[[i]]$CWM$Length_maturity
+  stations<-rownames(cephFD[[i]]$CWM)
+  years2<-rep(years[[i]],length(stations))
+  
+
+  Mean_temperature1<-c(Mean_temperature,Mean_temperature1)
+  Range_temperature1<-c(Range_temperature,Range_temperature1)
+  Max_Depth1<-c(Max_Depth,Max_Depth1)
+  Maximum_body_length1<-c(Maximum_body_length,Maximum_body_length1)
+  Fecundity1<-c(Fecundity,Fecundity1)
+  Trophic_level_1<-c(Trophic_level_,Trophic_level_1)
+  Length_maturity1<-c(Length_maturity,Length_maturity1)
+  station1<-c(stations,station1)
+  years1<-c(years2,years1)
+  
+}
+
+
+data_for_model<-data.frame(Mean_temperature1=Mean_temperature1,
+                           Range_temperature1=Range_temperature1,
+                           Max_Depth1=Max_Depth1,
+                           Maximum_body_length1=Maximum_body_length1,
+                           Fecundity1=Fecundity1,
+                           Trophic_level_1=Trophic_level_1,
+                           Length_maturity1=Length_maturity1,
+                           station=station1, 
+                           years1=years1)
+
+stations<-unique(data_for_model$station1)
+stations_2<-slope1<-pvalue1<-NULL
+
+
+save(data_for_model, file="DATA/data_for_model_cephalo.Rdata")
+
+```
+
+
+
+
+
+## 2.4.2 Correlative relation between environmental predictors and CWMs
+
+## 2.4.3. Clustering CWM linear trends to determine spatial patterns associated to temporal changes in community traits
+
+```{r}
+############
+# Create rectangles 
+###############
+library(tidyverse)
+library(sf)
+library(raster)
+library(viridis)
+
+
+trait<-Trait_GG87_MC97 %>% 
+  group_by(No_Station)%>% 
+  summarise (Lat=mean(Lat, na.rm=TRUE), Lon=mean(Lon, na.rm=TRUE))
+
+colnames(trait)<-c("station","Lat","Lon")
+
+mydata<-trait %>%  st_as_sf(coords = c("Lon", "Lat"), 
+                            crs = 4326, agr = "constant")
+
+
+gridx <- seq(from = -11.5,to = -4.5, by = 1)
+gridy <- seq(from = 47,to = 52, by = 1)
+
+
+foo <- raster(xmn = -11.5, xmx = -4.5,
+              ymn = 47, ymx = 52,
+              nrows = length(gridx),
+              ncols = length(gridy)) %>% 
+  rasterToPolygons() %>% 
+  st_as_sf(crs = 4326) %>% 
+  mutate(group = 1:(length(gridx)*length(gridy))) %>% 
+  st_cast("MULTIPOLYGON")
+
+
+mutate(foo,
+       count = lengths(st_intersects(x = foo,  y =mydata ))) -> foo
+
+
+ggplot() +
+  geom_sf(data = foo, aes(fill = count)) +
+  scale_fill_viridis(option = "D") -> g
+
+
+g
+
+llll<-st_intersects(x =mydata,y = foo,  )
+trait$rectangle<-NA
+for (i in 1: length(unique(trait$station))){
+  trait$rectangle[i]<-llll[[i]]
+}
+
+data_for_model1<-merge(data_for_model, trait, by="station")
+### define SpatialGrid object
+rectangles<-unique(data_for_model1$rectangle)
+rectangle_1<-NULL
+slope1<-slope2<-slope3<-slope4<-slope5<-slope6<-slope7<-slope8<-slope9<-NULL
+slope1_1<-slope2_1<-slope3_1<-slope4_1<-slope5_1<-slope6_1<-slope7_1<-slope8_1<-slope9_1<-NULL
+pvalue1<-pvalue2<-pvalue3<-pvalue4<-pvalue5<-pvalue6<-pvalue7<-pvalue8<-pvalue9<-NULL
+pvalue1_1<-pvalue2_1<-pvalue3_1<-pvalue4_1<-pvalue5_1<-pvalue6_1<-pvalue7_1<-pvalue8_1<-pvalue9_1<-NULL
+for (j in 1:length(rectangles)){
+  
+  
+   m1<-lm(Mean_temperature1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m2<-lm(Max_Depth1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m3<-lm(Maximum_body_length1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m4<-lm(Fecundity1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m5<-lm(Offspring_size1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m6<-lm(Trophic_level_1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m7<-lm(Range_salinity1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+   m8<-lm(Growth_rate1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m9<-lm(Age_maturity1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  
+  
+  rectangle<-rectangles[j]
+  rectangle_1<-c(rectangle, rectangle_1)
+  
+  
+  sum1<-summary(m1)
+  pvalue1<-sum1$coefficients[8]
+  slope1<-sum1$coefficients[2]
+  slope1_1<-c(slope1,slope1_1)
+  pvalue1_1<-c(pvalue1,pvalue1_1)
+  
+  sum2<-summary(m2)
+  pvalue2<-sum2$coefficients[8]
+  slope2<-sum2$coefficients[2]
+  slope2_1<-c(slope2,slope2_1)
+  pvalue2_1<-c(pvalue2,pvalue2_1)
+  
+  sum3<-summary(m3)
+  pvalue3<-sum3$coefficients[8]
+  slope3<-sum3$coefficients[2]
+  slope3_1<-c(slope3,slope3_1)
+  pvalue3_1<-c(pvalue3,pvalue3_1)
+  
+  sum4<-summary(m4)
+  pvalue4<-sum4$coefficients[8]
+  slope4<-sum4$coefficients[2]
+  slope4_1<-c(slope4,slope4_1)
+  pvalue4_1<-c(pvalue4,pvalue4_1)
+  
+  sum5<-summary(m5)
+  pvalue5<-sum5$coefficients[8]
+  slope5<-sum5$coefficients[2]
+  slope5_1<-c(slope5,slope5_1)
+  pvalue5_1<-c(pvalue5,pvalue5_1)
+  
+  sum6<-summary(m6)
+  pvalue6<-sum6$coefficients[8]
+  slope6<-sum6$coefficients[2]
+  slope6_1<-c(slope6,slope6_1)
+  pvalue6_1<-c(pvalue6,pvalue6_1)
+  
+  sum7<-summary(m7)
+  pvalue7<-sum7$coefficients[8]
+  slope7<-sum7$coefficients[2]
+  slope7_1<-c(slope7,slope7_1)
+  pvalue7_1<-c(pvalue7,pvalue7_1)
+  
+  sum8<-summary(m8)
+  pvalue8<-sum8$coefficients[8]
+  slope8<-sum8$coefficients[2]
+  slope8_1<-c(slope8,slope8_1)
+  pvalue8_1<-c(pvalue8,pvalue8_1)
+  
+  sum9<-summary(m9)
+  pvalue9<-sum9$coefficients[8]
+  slope9<-sum9$coefficients[2]
+  slope9_1<-c(slope9,slope9_1)
+  pvalue9_1<-c(pvalue9,pvalue9_1)
+}
+
+
+model_outputs_Mtemp<-data.frame(station=rectangle_1, slope=slope1_1, pvalue=pvalue1_1)
+model_outputs_MDepth<-data.frame(station=rectangle_1, slope=slope2_1, pvalue=pvalue2_1)
+model_outputs_Mlength<-data.frame(station=rectangle_1, slope=slope3_1, pvalue=pvalue3_1)
+model_outputs_Fec<-data.frame(station=rectangle_1, slope=slope4_1, pvalue=pvalue4_1)
+model_outputs_Off<-data.frame(station=rectangle_1, slope=slope5_1, pvalue=pvalue5_1)
+model_outputs_TL<-data.frame(station=rectangle_1, slope=slope6_1, pvalue=pvalue6_1)
+model_outputs_Rsal<-data.frame(station=rectangle_1, slope=slope7_1, pvalue=pvalue7_1)
+model_outputs_GR<-data.frame(station=rectangle_1, slope=slope8_1, pvalue=pvalue8_1)
+model_outputs_Amat<-data.frame(station=rectangle_1, slope=slope9_1, pvalue=pvalue9_1)
+
+
+#write.csv(model_outputs, file="linear_model_outputs_TL.csv")
+
+
+model_outputs_Mtemp$Var<-"Mtemp"
+model_outputs_MDepth$Var<-"MDepth"
+model_outputs_Mlength$Var<-"MLength"
+model_outputs_Fec$Var<-"Fec"
+model_outputs_Off$Var<-"Off"
+model_outputs_TL$Var<-"TL"
+model_outputs_Rsal$Var<-"Rsal"
+model_outputs_GR$Var<-"GR"
+model_outputs_Amat$Var<-"Amat"
+
+model_outputs_all<-rbind(model_outputs_Fec,
+                         model_outputs_MDepth,
+                         model_outputs_Mlength,model_outputs_Mtemp,model_outputs_Off,
+                         model_outputs_TL)
+
+ dddd<-model_outputs_Amat
+ # dddd<-model_outputs_Fec
+ # dddd<-model_outputs_GR
+ # dddd<-model_outputs_MDepth
+ # dddd<-model_outputs_Mlength
+ # dddd<-model_outputs_Mtemp
+ # dddd<-model_outputs_Off
+ # dddd<-model_outputs_Rsal
+ # dddd<-model_outputs_TL
+
+foo1<-foo
+foo1$slope<-NA
+foo1$pvalue<-NA
+for ( k in 1: nrow(dddd)){
+  m<-dddd$station[k]
+  foo1$slope[m]<-dddd$slope[k]
+  foo1$pvalue[m]<-dddd$pvalue[k]
+  
+}
+
+
+# Figure to improve with trends and significative trends by functional traits ? 
+foo1<-foo1[!is.na(foo1$slope),]
+foo1$signif<-NA
+# foo1$signif[(foo1$pvalue*39)<0.01]<-"y"
+foo1$signif[(foo1$pvalue*39)<0.05]<-"y"
+
+ggplot() +
+  geom_sf(data = foo1, aes(fill = slope), alpha = 1) +
+  geom_sf(data = foo1[!is.na(foo1$signif),], aes(fill=slope, colour=signif),colour="black", lwd=1)+
+  scale_fill_steps2(
+    low = "seagreen4", 
+    mid = "white", 
+    high = "darkred", 
+    midpoint = 0
+  ) +
+  borders(fill="gray44",colour="black") +
+  coord_sf(xlim=c(-12,-3),ylim=c(47,52))+
+  labs(x ="Longitude",y= "Latitude")+
+  # ggtitle("Fish TL")+
+  # ggtitle("Fish MDepth")+
+  # ggtitle("Fish MTemp")+
+  # ggtitle(" Fish RSal")+
+  # ggtitle("Fish Mlength")+
+  ggtitle("Fish AMat")+
+  # ggtitle("Fish GR")+
+  # ggtitle("Fish Fec")+
+  # ggtitle("Fish Off")+
+  #theme(legend.position = c(legx,legy))+
+  theme_minimal()
+
+
+
+#### clustering for zonation of functional variability 
+
+library("factoextra")
+
+model_outputs_all1<-data.frame(Fec=model_outputs_Fec$slope,
+                         Depth=model_outputs_MDepth$slope,
+                         Length=model_outputs_Mlength$slope,
+                         Temp=model_outputs_Mtemp$slope,
+                         Off=model_outputs_Off$slope,
+                         TL=model_outputs_TL$slope, 
+                         Amat=model_outputs_Amat$slope, 
+                         GR=model_outputs_GR$slope, 
+                         Rsal=model_outputs_Rsal$slope)
+rownames(model_outputs_all1)<-model_outputs_Fec$station
+
+
+fviz_nbclust(model_outputs_all1, kmeans, method = "gap_stat")
+
+set.seed(123)
+
+# Compute
+library("NbClust")
+res.nbclust <- model_outputs_all1%>%
+  scale() %>%
+  NbClust(distance = "euclidean",
+          min.nc = 2, max.nc = 10, 
+          method = "kmeans", index ="all") 
+
+
+set.seed(123)
+km.res <- kmeans(model_outputs_all1, 2, nstart = 25)
+# Visualize
+library("factoextra")
+fviz_cluster(km.res, data = model_outputs_all1,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+```
+
+
+```{r}
+data_for_model1<-merge(data_for_model, trait, by="station")
+### define SpatialGrid object
+rectangles<-unique(data_for_model1$rectangle)
+rectangle_1<-NULL
+slope1<-slope2<-slope3<-slope4<-slope5<-slope6<-slope7<-NULL
+slope1_1<-slope2_1<-slope3_1<-slope4_1<-slope5_1<-slope6_1<-slope7_1<-NULL
+pvalue1<-pvalue2<-pvalue3<-pvalue4<-pvalue5<-pvalue6<-pvalue7<-NULL
+pvalue1_1<-pvalue2_1<-pvalue3_1<-pvalue4_1<-pvalue5_1<-pvalue6_1<-pvalue7_1<-NULL
+for (j in 1:length(rectangles)){
+  
+  
+  m1<-lm(Mean_temperature1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m2<-lm(Range_temperature1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m3<-lm(Max_Depth1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m4<-lm(Maximum_body_length1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m5<-lm(Fecundity1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m6<-lm(Trophic_level_1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  m7<-lm(Length_maturity1~years1, data_for_model1[data_for_model1$rectangle==rectangles[j],])
+  
+  
+  rectangle<-rectangles[j]
+  rectangle_1<-c(rectangle, rectangle_1)
+  
+  
+  sum1<-summary(m1)
+  pvalue1<-sum1$coefficients[8]
+  slope1<-sum1$coefficients[2]
+  slope1_1<-c(slope1,slope1_1)
+  pvalue1_1<-c(pvalue1,pvalue1_1)
+  
+  sum2<-summary(m2)
+  pvalue2<-sum2$coefficients[8]
+  slope2<-sum2$coefficients[2]
+  slope2_1<-c(slope2,slope2_1)
+  pvalue2_1<-c(pvalue2,pvalue2_1)
+  
+  sum3<-summary(m3)
+  pvalue3<-sum3$coefficients[8]
+  slope3<-sum3$coefficients[2]
+  slope3_1<-c(slope3,slope3_1)
+  pvalue3_1<-c(pvalue3,pvalue3_1)
+  
+  sum4<-summary(m4)
+  pvalue4<-sum4$coefficients[8]
+  slope4<-sum4$coefficients[2]
+  slope4_1<-c(slope4,slope4_1)
+  pvalue4_1<-c(pvalue4,pvalue4_1)
+  
+  sum5<-summary(m5)
+  pvalue5<-sum5$coefficients[8]
+  slope5<-sum5$coefficients[2]
+  slope5_1<-c(slope5,slope5_1)
+  pvalue5_1<-c(pvalue5,pvalue5_1)
+  
+  sum6<-summary(m6)
+  pvalue6<-sum6$coefficients[8]
+  slope6<-sum6$coefficients[2]
+  slope6_1<-c(slope6,slope6_1)
+  pvalue6_1<-c(pvalue6,pvalue6_1)
+  
+  sum7<-summary(m7)
+  pvalue7<-sum7$coefficients[8]
+  slope7<-sum7$coefficients[2]
+  slope7_1<-c(slope7,slope7_1)
+  pvalue7_1<-c(pvalue7,pvalue7_1)
+  
+}
+
+
+model_outputs_Mtemp<-data.frame(station=rectangle_1, slope=slope1_1, pvalue=pvalue1_1)
+model_outputs_Rtemp<-data.frame(station=rectangle_1, slope=slope2_1, pvalue=pvalue2_1)
+model_outputs_MDepth<-data.frame(station=rectangle_1, slope=slope3_1, pvalue=pvalue3_1)
+model_outputs_Mlength<-data.frame(station=rectangle_1, slope=slope4_1, pvalue=pvalue4_1)
+model_outputs_Fec<-data.frame(station=rectangle_1, slope=slope5_1, pvalue=pvalue5_1)
+model_outputs_TL<-data.frame(station=rectangle_1, slope=slope6_1, pvalue=pvalue6_1)
+model_outputs_Lmat<-data.frame(station=rectangle_1, slope=slope7_1, pvalue=pvalue7_1)
+
+
+#write.csv(model_outputs, file="linear_model_outputs_TL.csv")
+
+
+model_outputs_Mtemp$Var<-"Mtemp"
+model_outputs_Rtemp$Var<-"Rtemp"
+model_outputs_MDepth$Var<-"MDepth"
+model_outputs_Mlength$Var<-"MLength"
+model_outputs_Fec$Var<-"Fec"
+model_outputs_TL$Var<-"TL"
+model_outputs_Lmat$Var<-"Lmat"
+
+model_outputs_all<-rbind(model_outputs_Fec,
+                         model_outputs_Rtemp,
+                         model_outputs_MDepth,
+                         model_outputs_Mlength,
+                         model_outputs_Mtemp,
+                         model_outputs_TL,
+                         model_outputs_Lmat)
+
+dddd<-model_outputs_Lmat
+ # dddd<-model_outputs_Fec
+ # dddd<-model_outputs_MDepth
+ # dddd<-model_outputs_Mlength
+ # dddd<-model_outputs_Mtemp
+ # dddd<-model_outputs_Rtemp
+ # dddd<-model_outputs_TL
+
+foo1<-foo
+foo1$slope<-NA
+foo1$pvalue<-NA
+for ( k in 1: nrow(dddd)){
+  m<-dddd$station[k]
+  foo1$slope[m]<-dddd$slope[k]
+  foo1$pvalue[m]<-dddd$pvalue[k]
+  
+}
+
+
+# Figure to improve with trends and significative trends by functional traits ? 
+foo1<-foo1[!is.na(foo1$slope),]
+foo1$signif<-NA
+foo1$signif[(foo1$pvalue*39)<0.05]<-"y"
+
+ggplot() +
+  geom_sf(data = foo1, aes(fill = slope), alpha = 1) +
+  geom_sf(data = foo1[!is.na(foo1$signif),], aes(fill=slope, colour=signif),colour="black", lwd=1)+
+  scale_fill_steps2(
+    low = "seagreen4", 
+    mid = "white", 
+    high = "darkred", 
+    midpoint = 0
+  ) +
+  borders(fill="gray44",colour="black") +
+  coord_sf(xlim=c(-12,-3),ylim=c(47,52))+
+  labs(x ="Longitude",y= "Latitude")+
+  # ggtitle("Cephalopod TL")+
+  # ggtitle("Cephalopod MDepth")+
+  # ggtitle("Cephalopod MTemp")+
+  # ggtitle("Cephalopod RTemp")+
+  # ggtitle("Cephalopod Mlength")+
+  ggtitle("Cephalopod LMat")+
+  # ggtitle("Cephalopod Fec")+
+  #theme(legend.position = c(legx,legy))+
+  theme_minimal()
+
+
+```
+## 2.4.4. Using dissimilarity indices to characterized drivers of spatio-temporal reorganization
